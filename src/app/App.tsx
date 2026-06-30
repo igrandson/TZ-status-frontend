@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   Sun, Moon, Search, AlertTriangle, CheckCircle2, ZapOff,
-  TrendingDown, Users, Activity, Award, History,
+  TrendingDown, Users, Activity, Award, History, Share2, ExternalLink,
   LayoutDashboard, Server, AlertCircle, RefreshCw,
 } from "lucide-react";
 import {
@@ -70,7 +70,7 @@ function HealthRing({ health, size = 56 }: { health: number; size?: number }) {
   );
 }
 
-function ServiceCard({ svc, onClick }: { svc: ServiceEntry; onClick: () => void }) {
+function ServiceCard({ svc, onClick, onOpenWindow }: { svc: ServiceEntry; onClick: () => void; onOpenWindow?: (service: ServiceEntry) => void }) {
   const [imgErr, setImgErr] = useState(false);
   const domain = domainMap[svc.name];
   const favicon = domain ? `https://www.google.com/s2/favicons?domain=${domain}&sz=64` : null;
@@ -80,7 +80,7 @@ function ServiceCard({ svc, onClick }: { svc: ServiceEntry; onClick: () => void 
     svc.health >= 30 ? "border-t-orange-400" : "border-t-red-500";
   return (
     <button onClick={onClick}
-      className={`group w-full text-left bg-card border border-border border-t-2 ${borderTop} rounded-2xl p-4 shadow-sm hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40`}>
+      className={`group w-full text-left bg-card border border-border border-t-2 ${borderTop} rounded-2xl p-4 shadow-sm hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 relative`}>
       <div className="flex items-start justify-between gap-2 mb-3">
         <div className="flex items-center gap-2.5 min-w-0">
           {favicon && !imgErr
@@ -89,7 +89,17 @@ function ServiceCard({ svc, onClick }: { svc: ServiceEntry; onClick: () => void 
           }
           <span className="text-sm font-semibold text-foreground truncate">{svc.name}</span>
         </div>
-        <HealthRing health={svc.health} size={44} />
+        <div className="flex items-center gap-2">
+          {onOpenWindow && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onOpenWindow(svc); }}
+              className="p-1 rounded-lg hover:bg-secondary transition-colors opacity-0 group-hover:opacity-100"
+              title="Open in new window">
+              <ExternalLink className="w-3.5 h-3.5 text-muted-foreground" />
+            </button>
+          )}
+          <HealthRing health={svc.health} size={44} />
+        </div>
       </div>
       <Sparkline values={svc.trend} health={svc.health} />
       <div className="flex items-center justify-between mt-1">
@@ -102,7 +112,7 @@ function ServiceCard({ svc, onClick }: { svc: ServiceEntry; onClick: () => void 
   );
 }
 
-function ServiceModal({ svc, onClose }: { svc: ServiceEntry; onClose: () => void }) {
+function ServiceModal({ svc, onClose, onOpenWindow }: { svc: ServiceEntry; onClose: () => void; onOpenWindow?: (svc: ServiceEntry) => void }) {
   const [hourly, setHourly] = useState<{ hour: number; uptime_pct: number; avg_response_ms: number | null }[]>([]);
   const [daily, setDaily] = useState<{ date: string; uptime_pct: number; avg_response_ms: number | null }[]>([]);
   const [reporting, setReporting] = useState(false);
@@ -143,7 +153,14 @@ function ServiceModal({ svc, onClose }: { svc: ServiceEntry; onClose: () => void
           </div>
           <div className="flex items-center gap-3">
             <HealthRing health={svc.health} size={52} />
-            <button onClick={onClose} className="p-2 rounded-xl hover:bg-secondary transition-colors text-muted-foreground">✕</button>
+            <div className="flex gap-2">
+              {onOpenWindow && (
+                <button onClick={() => onOpenWindow(svc)} className="p-2 rounded-xl hover:bg-secondary transition-colors text-muted-foreground" title="Open in new window">
+                  <ExternalLink className="w-4 h-4" />
+                </button>
+              )}
+              <button onClick={onClose} className="p-2 rounded-xl hover:bg-secondary transition-colors text-muted-foreground">✕</button>
+            </div>
           </div>
         </div>
         <div className="p-6 space-y-5">
@@ -245,7 +262,7 @@ function IncidentsList({ incidents }: { incidents: Incident[] }) {
   );
 }
 
-function OverviewTab({ services, incidents, onServiceClick }: { services: ServiceEntry[]; incidents: Incident[]; onServiceClick: (s: ServiceEntry) => void }) {
+function OverviewTab({ services, incidents, onServiceClick, onOpenWindow }: { services: ServiceEntry[]; incidents: Incident[]; onServiceClick: (s: ServiceEntry) => void; onOpenWindow: (s: ServiceEntry) => void }) {
   const critical = services.filter(s => s.status === "down").slice(0, 6);
   return (
     <div className="space-y-10">
@@ -265,7 +282,7 @@ function OverviewTab({ services, incidents, onServiceClick }: { services: Servic
             <ZapOff className="w-4 h-4 text-red-500" /> Down Services
           </h2>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {critical.map(svc => <ServiceCard key={svc.id} svc={svc} onClick={() => onServiceClick(svc)} />)}
+            {critical.map(svc => <ServiceCard key={svc.id} svc={svc} onClick={() => onServiceClick(svc)} onOpenWindow={onOpenWindow} />)}
           </div>
         </section>
       )}
@@ -273,7 +290,7 @@ function OverviewTab({ services, incidents, onServiceClick }: { services: Servic
   );
 }
 
-function ServicesTab({ services, onServiceClick, query }: { services: ServiceEntry[]; onServiceClick: (s: ServiceEntry) => void; query: string }) {
+function ServicesTab({ services, onServiceClick, query, onOpenWindow }: { services: ServiceEntry[]; onServiceClick: (s: ServiceEntry) => void; query: string; onOpenWindow: (s: ServiceEntry) => void }) {
   const [activeCat, setActiveCat] = useState<string | null>(null);
   const filtered = services.filter(s => {
     const matchCat = !activeCat || s.category === activeCat;
@@ -307,7 +324,7 @@ function ServicesTab({ services, onServiceClick, query }: { services: ServiceEnt
               <div className="flex-1 h-px bg-border" />
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-              {catServices.map(svc => <ServiceCard key={svc.id} svc={svc} onClick={() => onServiceClick(svc)} />)}
+              {catServices.map(svc => <ServiceCard key={svc.id} svc={svc} onClick={() => onServiceClick(svc)} onOpenWindow={onOpenWindow} />)}
             </div>
           </section>
         );
@@ -382,6 +399,34 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [clock, setClock] = useState(new Date());
+  const bcRef = useRef<BroadcastChannel | null>(null);
+
+  // Initialize BroadcastChannel for multi-window sync
+  useEffect(() => {
+    try {
+      bcRef.current = new BroadcastChannel("tz-status-sync");
+      bcRef.current.onmessage = (event) => {
+        if (event.data.type === "service-selected") {
+          setSelected(event.data.service);
+          setTab("overview");
+        } else if (event.data.type === "services-updated") {
+          setServices(event.data.services);
+        }
+      };
+    } catch {
+      console.debug("BroadcastChannel not available");
+    }
+    return () => {
+      bcRef.current?.close();
+    };
+  }, []);
+
+  const handleOpenWindow = (service: ServiceEntry) => {
+    const url = new URL(window.location.href);
+    url.searchParams.set("service", service.id.toString());
+    url.searchParams.set("autoOpen", "true");
+    window.open(url.toString(), `tz-status-${service.id}`, "width=1200,height=800,resizable=yes");
+  };
 
   const loadServices = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -400,6 +445,8 @@ export default function App() {
         }),
       );
       setServices(withTrends);
+      // Broadcast updated services to other windows
+      bcRef.current?.postMessage({ type: "services-updated", services: withTrends });
     } catch {
       setError("Can't reach the TZ Status API. Make sure uvicorn is running (port 8000).");
     } finally {
@@ -413,6 +460,20 @@ export default function App() {
     const poll = setInterval(() => loadServices(true), 15000);
     return () => clearInterval(poll);
   }, [loadServices]);
+
+  // Handle URL parameters for opening a specific service
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const serviceId = params.get("service");
+    if (serviceId && services.length > 0) {
+      const svc = services.find(s => s.id === parseInt(serviceId));
+      if (svc) {
+        setSelected(svc);
+        // Broadcast to other windows if needed
+        bcRef.current?.postMessage({ type: "service-selected", service: svc });
+      }
+    }
+  }, [services]);
 
   useEffect(() => {
     setStoredDarkMode(dark);
@@ -459,7 +520,7 @@ export default function App() {
             </div>
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-2 text-xs text-muted-foreground bg-card/70 border border-border rounded-full px-3 py-1.5 backdrop-blur-sm">
-                <div className={`w-1.5 h-1.5 rounded-full ${error ? "bg-amber-500" : allGood ? "bg-emerald-500" : "bg-red-500"} animate-pulse`} />
+                <div className={`w-1.5 h-1.5 rounded-full ${error ? "bg-amber-500" : services.length > 0 && services.filter(s => s.status === "down").length === 0 ? "bg-emerald-500" : "bg-red-500"} animate-pulse`} />
                 <span style={{ fontFamily: "'DM Mono', monospace" }}>{clock.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</span>
               </div>
               <button onClick={() => loadServices(true)} disabled={refreshing}
@@ -479,7 +540,7 @@ export default function App() {
               <div className="inline-flex items-center gap-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-400 text-sm font-semibold px-4 py-1.5 rounded-full mb-4">
                 <AlertTriangle className="w-4 h-4" /> {error}
               </div>
-            ) : allGood ? (
+            ) : services.length > 0 && services.filter(s => s.status === "down").length === 0 && incidents.length === 0 ? (
               <div className="inline-flex items-center gap-2 bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400 text-sm font-semibold px-4 py-1.5 rounded-full mb-4">
                 <CheckCircle2 className="w-4 h-4" /> All systems operational
               </div>
@@ -521,8 +582,8 @@ export default function App() {
           <div className="text-center py-16 text-muted-foreground">Loading live status from TZ Status API…</div>
         ) : (
           <>
-            {tab === "overview" && <OverviewTab services={services} incidents={incidents} onServiceClick={setSelected} />}
-            {tab === "services" && <ServicesTab services={services} onServiceClick={setSelected} query={query} />}
+            {tab === "overview" && <OverviewTab services={services} incidents={incidents} onServiceClick={setSelected} onOpenWindow={handleOpenWindow} />}
+            {tab === "services" && <ServicesTab services={services} onServiceClick={setSelected} query={query} onOpenWindow={handleOpenWindow} />}
             {tab === "incidents" && <IncidentsList incidents={incidents} />}
             {tab === "leaderboard" && <LeaderboardTab services={services} />}
             {tab === "history" && <HistoryTab />}
@@ -541,7 +602,7 @@ export default function App() {
         </div>
       </footer>
 
-      {selected && <ServiceModal svc={selected} onClose={() => setSelected(null)} />}
+      {selected && <ServiceModal svc={selected} onClose={() => setSelected(null)} onOpenWindow={handleOpenWindow} />}
     </div>
   );
 }
