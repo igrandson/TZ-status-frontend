@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: tz-status-frontend
+    env: static
+    region: oregon
+    plan: free
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: VITE_API_URL
+        value: https://tz-status-api.onrender.com
